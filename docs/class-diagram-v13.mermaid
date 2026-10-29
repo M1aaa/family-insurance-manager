@@ -1,0 +1,138 @@
+classDiagram
+    class Member {
+        +str id
+        +str name
+        +Relation relation
+        +date birth_date
+        +Gender gender
+        +str remark
+        +int policy_count
+        +int active_policy_count
+        +Decimal annual_premium
+        +list~CoverageTypeStatOut~ coverage_types
+    }
+
+    class Policy {
+        +str id
+        +str company
+        +InsuranceType insurance_type
+        +str product_name
+        +str policyholder_id
+        +str insured_id
+        +date effective_date
+        +PolicyStatus status
+        +int paid_periods_override
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class PolicyInsured {
+        +str policy_id
+        +str member_id
+    }
+
+    class PolicyBase {
+        <<request>>
+        +str company
+        +InsuranceType insurance_type
+        +str product_name
+        +str policyholder_id
+        +list~str~ insured_ids
+        +str primary_insured_id
+        +str insured_id
+        +date effective_date
+        +PolicyStatus status
+        +int paid_periods_override
+        +validate_insureds()
+    }
+
+    class PolicyOut {
+        <<response>>
+        +str id
+        +str policyholder_id
+        +str policyholder_name
+        +str insured_id
+        +str primary_insured_id
+        +list~str~ insured_ids
+        +list~str~ insured_names
+        +str insured_name
+        +int attachment_count
+        +Decimal annualized_premium
+        +int paid_periods
+        +int overdue_periods
+    }
+
+    class UpcomingItemOut {
+        <<response>>
+        +str policy_id
+        +str insured_id
+        +str insured_name
+        +list~str~ insured_ids
+        +list~str~ insured_names
+        +date due_date
+        +int period_index
+    }
+
+    class OverdueItemOut {
+        <<response>>
+        +str policy_id
+        +str insured_id
+        +str insured_name
+        +list~str~ insured_ids
+        +list~str~ insured_names
+        +int overdue_periods
+    }
+
+    class CoverageTypeStatOut {
+        <<response>>
+        +InsuranceType insurance_type
+        +int count
+        +int active_count
+        +Decimal annual_premium
+    }
+
+    class calc {
+        <<module>>
+        +allocate_amounts(total, n) list~Decimal~
+        +calc_schedule(policy, primary, today) Schedule
+    }
+    class insured_service {
+        <<module>>
+        +insured_sort_key(member) tuple
+        +set_policy_insureds(db, policy_id, ids, primary)
+        +get_insured_ids(db, policy_id) list~str~
+        +load_insured_map(db, policy_ids) dict
+        +count_policies_referencing_member(db, member_id) int
+    }
+    class policy_service {
+        <<module>>
+        +create_policy(db, data) PolicyOut
+        +update_policy(db, policy_id, data) PolicyOut
+        +_to_out(policy, insureds, holder, today, count) PolicyOut
+        +_assemble(db, policies, today) list~PolicyOut~
+        +list_policies(db, insured_id, ...) list~PolicyOut~
+    }
+    class stats_service {
+        <<module>>
+        +build_dashboard(db, today) DashboardOut
+        +_group_by_member(...) list~MemberStatOut~
+    }
+    class member_service {
+        <<module>>
+        +list_members(db) list~MemberOut~
+        +_member_stats(db, today) dict
+        +delete_member(db, member_id) dict
+    }
+
+    Policy "1" --> "1..*" PolicyInsured : policy_id (CASCADE)
+    Member "1" --> "0..*" PolicyInsured : member_id (RESTRICT)
+    Policy --> Member : insured_id = 主被保人 (RESTRICT)
+    Policy --> Member : policyholder_id (RESTRICT)
+    PolicyOut ..> Policy : 装配（insuredIds/Names 来自关联表）
+    MemberOut ..> CoverageTypeStatOut : coverageTypes
+    policy_service ..> insured_service : 读写关联表
+    stats_service ..> insured_service : 加载被保人集合
+    member_service ..> insured_service : 加载被保人集合
+    stats_service ..> calc : allocate_amounts
+    member_service ..> calc : allocate_amounts
+    insured_service ..> calc : enum_value

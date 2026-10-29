@@ -1,0 +1,39 @@
+%% v1.7 增量时序图：打开首页 → 临时筛选 → 存为默认
+sequenceDiagram
+    autonumber
+    participant U as 用户
+    participant JS as dashboard.js
+    participant API as api.js
+    participant R as routers/stats.py
+    participant S as stats_service
+    participant DB as SQLite
+
+    U->>JS: 打开首页
+    JS->>API: refreshAll()
+    API->>R: GET /api/stats/dashboard
+    R->>S: build_dashboard(db, today)
+    S->>DB: SELECT policies / members / stats_exclusions
+    S->>S: 年化口径按 (投保人 ∪ 险种) 过滤
+    S->>S: yearUnpaidPremium = Σ enumerate_year_periods(...)（不过滤）
+    S-->>R: DashboardOut
+    R-->>API: JSON
+    JS->>API: getExclusions()
+    API->>R: GET /api/stats/exclusions
+    R->>S: get_exclusions(db)
+    S->>DB: SELECT stats_exclusions + members.count_in_stats
+    S-->>JS: {excludedPolicyholderIds, excludedInsuranceTypes}
+    JS->>JS: 渲染 6 卡 + 筛选面板（初始 = 已保存默认）
+
+    U->>JS: 取消勾选某投保人 / 某险种（临时）
+    JS->>JS: tempExcluded 更新 → recomputeAnnualized(policies, ...)
+    Note over JS: 不落库、不发请求；卡片 ① ② 与三维分布实时刷新
+    U->>JS: 点击「重置为默认」
+    JS->>JS: tempExcluded = 已保存配置 → 恢复后端数字
+
+    U->>JS: 点击「存为默认」
+    JS->>API: saveExclusions({excludedPolicyholderIds, excludedInsuranceTypes})
+    API->>R: PUT /api/stats/exclusions
+    R->>S: set_exclusions(db, data)
+    S->>DB: UPDATE members.count_in_stats；DELETE/INSERT stats_exclusions
+    S-->>JS: 保存后配置
+    JS->>JS: 重新拉取 dashboard（持久化已生效）

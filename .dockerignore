@@ -1,0 +1,62 @@
+# --- 版本控制 / 文档 ---
+.git/
+.gitignore
+docs/
+README.md
+overview.md
+
+# --- 虚拟环境与缓存 ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 测试 ---
+tests/
+
+# --- 运行期数据（容器内由 volume 提供） ---
+data/
+
+# --- 构建 / 编排 / 启动脚本（镜像内不需要） ---
+Dockerfile
+docker-compose.yml
+docker-compose.build.yml
+.dockerignore
+scripts/
+tools/
+dist/
+start.bat
+start.sh
+requirements-dev.txt
+
+# --- 本地环境变量 ---
+.env
+.env.example
+
+# --- 协作工具残留 ---
+.workbuddy-ai/
+
+# --- 项目根目录协作遗留临时文件 / 临时工作目录（不进入构建上下文） ---
+# 注意：Dockerfile 仅按需 COPY app / static / requirements.txt，本段只影响构建上下文体积，
+# 但为稳妥起见，仍把「协作过程产生的临时文件」全部排除。
+_verify/
+qa_*.py
+qa_*.txt
+_*.py
+_*.txt
+_*.mjs
+_*.log
+_*.png
+_*.json
+_*.pdf
+_render_test.mjs
+
+# --- 编辑器 / 操作系统 ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

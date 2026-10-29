@@ -1,0 +1,70 @@
+%% v1.7 增量类图（仅新增 / 变更部分）
+%% 完整类图见 docs/class-diagram.mermaid 与 docs/class-diagram-v13.mermaid
+classDiagram
+    class StatsExclusion {
+        +str kind
+        +str ref_id
+        +datetime created_at
+    }
+
+    class OverviewOut {
+        +Decimal annual_total_premium
+        +Decimal unpaid_annual_premium
+        +Decimal year_unpaid_premium
+        +Decimal upcoming60_premium
+        +int upcoming60_count
+        +int policy_total
+        +int active_policy_count
+        +int insured_person_count
+        +int overdue_policy_count
+        +_ser_money(Decimal) float
+    }
+
+    class StatsExclusionsIn {
+        +list~str~ excluded_policyholder_ids
+        +list~InsuranceType~ excluded_insurance_types
+    }
+
+    class StatsExclusionsOut {
+        +list~str~ excluded_policyholder_ids
+        +list~str~ excluded_insurance_types
+    }
+
+    class calc {
+        <<module>>
+        +enumerate_year_periods(policy, insured, today, year)$ list~DueItem~
+        +due_date_for_period(eff, freq, k)$ date
+        +calc_schedule(policy, insured, today)$ Schedule
+        +money(x)$ Decimal
+    }
+
+    class stats_service {
+        <<module>>
+        +build_dashboard(db, today)$ DashboardOut
+        +get_exclusions(db)$ StatsExclusionsOut
+        +set_exclusions(db, data)$ StatsExclusionsOut
+        -_group_by_insured()
+        -_group_by_policyholder()
+        -_group_by_type()
+    }
+
+    class insured_service {
+        <<module>>
+        +excluded_holder_ids(members)$ set~str~
+        +excluded_insurance_types(db)$ set~str~
+    }
+
+    class member_service {
+        <<module>>
+        +list_members(db)$ list~MemberOut~
+        -_member_stats(db, today)$ dict
+    }
+
+    stats_service ..> calc : 调用 enumerate_year_periods / calc_schedule
+    stats_service ..> insured_service : 读取排除集合
+    stats_service ..> OverviewOut : 构造
+    stats_service ..> StatsExclusion : 读写
+    stats_service ..> StatsExclusionsIn : 入参
+    stats_service ..> StatsExclusionsOut : 出参
+    member_service ..> insured_service : 读取排除集合
+    member_service ..> calc : 分摊年化

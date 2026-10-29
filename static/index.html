@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>家庭保险整理工具</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-icon" viewBox="0 0 32 32" width="28" height="28" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="brand-shield" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2f6feb"></stop>
+            <stop offset="1" stop-color="#1b4fd8"></stop>
+          </linearGradient>
+        </defs>
+        <path d="M16 2 L28 7 V15 C28 22.5 22.8 27.6 16 30 C9.2 27.6 4 22.5 4 15 V7 Z" fill="url(#brand-shield)"></path>
+        <path d="M10.5 16.2 L14.4 20.1 L21.8 12.2" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span class="brand-name">家庭保险整理工具</span>
+    </div>
+    <nav class="tabs" id="nav-tabs">
+      <button class="tab" type="button" data-route="#/dashboard">总览</button>
+      <button class="tab" type="button" data-route="#/policies">保单列表</button>
+      <button class="tab" type="button" data-route="#/members">家庭成员</button>
+    </nav>
+    <div class="topbar-actions">
+      <button class="btn primary" type="button" id="btn-new-policy">+ 新增保单</button>
+    </div>
+  </header>
+
+  <main class="content">
+    <section id="view-dashboard" class="view" hidden></section>
+    <section id="view-policies" class="view" hidden></section>
+    <section id="view-members" class="view" hidden></section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

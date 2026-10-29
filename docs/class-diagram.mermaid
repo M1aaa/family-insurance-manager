@@ -1,0 +1,236 @@
+%% 家庭保险整理工具 — 类图 (class-diagram)
+%% 说明：ORM 模型 + 枚举 + 计算模块 + 业务服务 + 路由 + Pydantic Schema
+classDiagram
+    direction LR
+
+    %% ================= 枚举（值存中文字符串） =================
+    class InsuranceType {
+        <<enumeration>>
+        重疾险
+        医疗险
+        意外险
+        寿险
+        年金险
+        教育金
+        车险
+        财产险
+        其他
+    }
+    class PolicyStatus {
+        <<enumeration>>
+        生效中
+        已缴清
+        已退保
+        已失效
+    }
+    class CoverageTermType {
+        <<enumeration>>
+        终身
+        固定年限
+        至某年龄
+    }
+    class PaymentTermType {
+        <<enumeration>>
+        趸交
+        固定年限
+        交至某年龄
+    }
+    class PaymentFrequency {
+        <<enumeration>>
+        月缴
+        年缴
+    }
+    class Relation {
+        <<enumeration>>
+        本人
+        配偶
+        子女
+        父亲
+        母亲
+        其他
+    }
+    class Gender {
+        <<enumeration>>
+        男
+        女
+        未知
+    }
+
+    %% ================= ORM 模型 =================
+    class Member {
+        +str id
+        +str name
+        +Relation relation
+        +date birth_date
+        +Gender gender
+        +str remark
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    class Policy {
+        +str id
+        +str company
+        +InsuranceType insurance_type
+        +str product_name
+        +str policyholder_id
+        +str insured_id
+        +date effective_date
+        +CoverageTermType coverage_term_type
+        +int coverage_term_value
+        +PaymentTermType payment_term_type
+        +int payment_term_value
+        +PaymentFrequency payment_frequency
+        +Decimal premium_per_period
+        +Decimal insured_amount
+        +PolicyStatus status
+        +str remark
+        +datetime created_at
+        +datetime updated_at
+    }
+
+    %% ================= 计算模块（纯函数） =================
+    class Calc {
+        <<module calc.py>>
+        +age_years(birth, on) int
+        +add_years(d, n) date
+        +money(x) Decimal
+        +pct(num, den) Decimal
+        +compute_k_max(effective, freq, today) int
+        +calc_schedule(policy, insured, today) Schedule
+        +enumerate_upcoming(policy, insured, today, window_days) List~DueItem~
+    }
+    class Schedule {
+        <<value object>>
+        +Decimal annualized_premium
+        +int total_periods
+        +int paid_periods
+        +Decimal cumulative_paid
+        +int remaining_periods
+        +bool is_paid_off
+        +Decimal progress_percent
+        +bool in_coverage
+        +date next_due_date
+    }
+    class DueItem {
+        <<value object>>
+        +str policy_id
+        +date due_date
+        +int period_index
+        +int total_periods
+        +Decimal amount
+    }
+
+    %% ================= 业务服务层 =================
+    class MemberService {
+        <<service>>
+        +list_members(db) List~MemberOut~
+        +create_member(db, data) Member
+        +update_member(db, id, data) Member
+        +delete_member(db, id) void
+    }
+    class PolicyService {
+        <<service>>
+        +list_policies(db, filters) List~PolicyOut~
+        +get_policy(db, id) Policy
+        +create_policy(db, data) Policy
+        +update_policy(db, id, data) Policy
+        +delete_policy(db, id) void
+        +_to_out(policy, insured, today) PolicyOut
+    }
+    class StatsService {
+        <<service>>
+        +build_dashboard(db, today) Dashboard
+        +_overview(...) Overview
+        +_by_member(...) ByMember
+        +_by_type(...) ByType
+        +_upcoming(...) List~DueItem~
+    }
+
+    %% ================= 路由层 =================
+    class MetaRouter {
+        <<router>>
+        +GET /api/health()
+        +GET /api/meta/enums()
+    }
+    class MembersRouter {
+        <<router>>
+        +GET /api/members()
+        +POST /api/members()
+        +PUT /api/members/{id}()
+        +DELETE /api/members/{id}()
+    }
+    class PoliciesRouter {
+        <<router>>
+        +GET /api/policies()
+        +POST /api/policies()
+        +GET /api/policies/{id}()
+        +PUT /api/policies/{id}()
+        +DELETE /api/policies/{id}()
+    }
+    class StatsRouter {
+        <<router>>
+        +GET /api/stats/dashboard()
+    }
+
+    %% ================= Pydantic Schema =================
+    class PolicyOut {
+        <<schema>>
+        +所有 Policy 字段(camelCase)
+        +Decimal annualizedPremium
+        +int totalPeriods
+        +int paidPeriods
+        +Decimal cumulativePaid
+        +int remainingPeriods
+        +bool isPaidOff
+        +Decimal progressPercent
+        +bool inCoverage
+        +date nextDueDate
+        +str insuredName
+        +str policyholderName
+    }
+    class MemberOut {
+        <<schema>>
+        +str id
+        +str name
+        +Relation relation
+        +date birthDate
+        +Gender gender
+        +str remark
+        +int policyCount
+        +int activePolicyCount
+        +Decimal annualPremium
+    }
+    class Dashboard {
+        <<schema>>
+        +date asOfDate
+        +Overview overview
+        +ByMember byMember
+        +List~ByTypeRow~ byType
+        +List~DueItem~ upcoming
+    }
+
+    %% ================= 关系 =================
+    Member "1" --> "0..*" Policy : insured_id (RESTRICT)
+    Member "1" --> "0..*" Policy : policyholder_id (RESTRICT)
+
+    Policy --> InsuranceType
+    Policy --> PolicyStatus
+    Policy --> CoverageTermType
+    Policy --> PaymentTermType
+    Policy --> PaymentFrequency
+    Member --> Relation
+    Member --> Gender
+
+    Calc ..> Schedule : returns
+    Calc ..> DueItem : returns
+    PolicyService ..> Calc : uses
+    StatsService ..> Calc : uses
+    PolicyService ..> PolicyOut : builds
+    MemberService ..> MemberOut : builds
+    StatsService ..> Dashboard : builds
+
+    PoliciesRouter ..> PolicyService
+    MembersRouter ..> MemberService
+    StatsRouter ..> StatsService
+    MetaRouter ..> InsuranceType : exposes enums

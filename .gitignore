@@ -1,0 +1,47 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 虚拟环境 ---
+.venv/
+venv/
+env/
+
+# --- 运行期数据（含真实家庭保单信息，绝不入库） ---
+# 数据库、备份、附件 PDF、运行日志全部排除；只保留目录占位文件
+data/*
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.log
+
+# --- 构建产物（镜像 tar 单个 157MB+，不进仓库） ---
+dist/
+*.tar
+
+# --- AI 协作工作文件（内部记忆、迭代手册，不入公开/共享仓库） ---
+.workbuddy-ai/
+.workbuddy/
+
+# --- 环境变量 / 密钥 ---
+.env
+.env.*
+*.pem
+*.key
+
+# --- 含真实家庭信息的截图（本地保留，不入库） ---
+docs/screenshots/
+
+# --- 编辑器 / 操作系统 ---
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

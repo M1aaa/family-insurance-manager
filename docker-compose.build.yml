@@ -1,0 +1,63 @@
+# ============================================================================
+# 家庭保险整理工具 — 本机构建 / 试跑用 Compose 文件
+# ----------------------------------------------------------------------------
+# 这个文件是干嘛的？
+#   在有 Docker 的电脑上「构建镜像」并「本地试跑」用的。
+#   它带 build: 段，会从当前目录的源码构建镜像。
+#
+# 它和 docker-compose.yml 的分工：
+#   docker-compose.yml        → 极空间 NAS 运行用（只有 image:，没有 build:）
+#   docker-compose.build.yml  → 电脑上构建/试跑用（有 build:，本文件）
+#
+# 怎么用？
+#   构建并启动：  docker compose -f docker-compose.build.yml up -d --build
+#   停止：        docker compose -f docker-compose.build.yml down
+#   看日志：      docker compose -f docker-compose.build.yml logs -f
+#
+# 怎么覆盖基础镜像 / pip 源（国内网络慢时）？
+#   真 Docker Compose 一定支持 ${VAR:-default}，可用环境变量覆盖：
+#     Windows PowerShell:
+#       $env:BASE_IMAGE="docker.m.daocloud.io/library/python:3.13-slim"
+#       $env:PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+#       docker compose -f docker-compose.build.yml up -d --build
+#     macOS / Linux:
+#       BASE_IMAGE=... PIP_INDEX_URL=... docker compose -f docker-compose.build.yml up -d --build
+#   默认值均为官方源，保证可移植性。
+# ============================================================================
+
+services:
+  insurance-tool:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: ${BASE_IMAGE:-python:3.13-slim}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
+        TZ: ${TZ:-Asia/Shanghai}
+    image: family-insurance-manager:1.7.0
+    container_name: family-insurance-manager
+    hostname: family-insurance-manager
+
+    ports:
+      # 本地试跑：http://localhost:8000。被占用可改左边端口。
+      - "8000:8000"
+
+    environment:
+      TZ: Asia/Shanghai
+      DB_PATH: /app/data/insurance.db
+      PORT: "8000"
+
+    volumes:
+      # 本地试跑时把宿主机 ./data 挂到容器，数据落在 ./data/insurance.db
+      - ./data:/app/data
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import os,sys,urllib.request; port=os.environ.get('PORT','8000'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3

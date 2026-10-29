@@ -1,0 +1,14 @@
+# --- Web 框架与 ASGI 服务器 ---
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+
+# --- ORM 与数据校验 ---
+SQLAlchemy==2.0.54
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# --- P1：Excel 导出（纯 Python，无编译依赖，容器内可离线安装） ---
+openpyxl==3.1.5
+
+# --- P1（v1.2）：文件上传表单解析（纯 Python，无编译依赖，容器内离线可装） ---
+python-multipart==0.0.20

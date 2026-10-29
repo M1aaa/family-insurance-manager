@@ -1,0 +1,82 @@
+%% 家庭保险整理工具 — 关键流程时序图 (sequence-diagram)
+%% 流程一：用户新增一张保单
+%% 流程二：用户打开总览看板
+
+%% ==================== 流程一：新增保单 ====================
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant PF as components/policyForm.js
+    participant API as api.js
+    participant RT as routers/policies.py
+    participant PS as services/policy_service.py
+    participant CALC as calc.py
+    participant DB as SQLite
+    participant ST as store.js
+    participant DASH as views/dashboard.js
+
+    U->>PF: 填写表单并点击「保存」
+    PF->>PF: 前端校验（必填 / 范围 / 条件必填 coverageTermValue）
+    PF->>API: createPolicy(payload)
+    API->>RT: POST /api/policies (JSON)
+    RT->>RT: Pydantic 校验（含条件必填 model_validator）
+    alt 校验失败
+        RT-->>API: 422 {code: VALIDATION_ERROR, message}
+        API-->>PF: 抛出错误 → 表单高亮提示
+    else 校验通过
+        RT->>PS: create_policy(db, data)
+        PS->>DB: SELECT members WHERE id IN (holder, insured)
+        alt 成员不存在
+            PS-->>RT: raise NotFound
+            RT-->>API: 422 / 404
+        else 成员存在
+            PS->>DB: INSERT INTO policies
+            DB-->>PS: policy row
+            PS->>CALC: calc_schedule(policy, insured, today)
+            CALC-->>PS: Schedule（派生字段）
+            PS-->>RT: PolicyOut
+            RT-->>API: 201 Created
+            API-->>PF: 新保单
+            PF->>ST: 关闭弹窗 + refresh()
+            ST->>API: getDashboard() + getPolicies()
+            API-->>ST: 最新数据
+            ST-->>DASH: 通知订阅者重渲染
+            DASH-->>U: 看板 / 列表已更新
+        end
+    end
+
+%% ==================== 流程二：打开总览看板 ====================
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant MAIN as main.js(router)
+    participant DASH as views/dashboard.js
+    participant API as api.js
+    participant RT as routers/stats.py
+    participant SS as services/stats_service.py
+    participant CALC as calc.py
+    participant DB as SQLite
+    participant CH as chart.js
+
+    U->>MAIN: 点击「总览」/ hash 变为 #/dashboard
+    MAIN->>DASH: render()
+    DASH->>API: getDashboard()
+    API->>RT: GET /api/stats/dashboard
+    RT->>SS: build_dashboard(db, today)
+    SS->>DB: SELECT * FROM policies
+    SS->>DB: SELECT * FROM members
+    DB-->>SS: rows
+    loop 每张保单
+        SS->>CALC: calc_schedule(policy, insured, today)
+        CALC-->>SS: Schedule
+        SS->>CALC: enumerate_upcoming(policy, insured, today, 60)
+        CALC-->>SS: DueItem[]
+    end
+    SS->>SS: 聚合 overview / byMember(双维度) / byType / upcoming
+    SS-->>RT: DashboardOut
+    RT-->>API: 200 OK (JSON)
+    API-->>DASH: dashboard data
+    DASH->>CH: renderPie(byMember.byInsured)
+    DASH->>CH: renderPie(byType)
+    DASH->>DASH: 渲染 4 张指标卡 + 两张分布表 + 待缴清单
+    DASH-->>U: 看板呈现（卡片 / 饼图 / 待缴清单）

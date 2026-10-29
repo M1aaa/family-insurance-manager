@@ -1,0 +1,118 @@
+%% ============================================================
+%% v1.3 增量时序图（多被保人 · 成员保障类型 · 分红险 · 列表直达 PDF）
+%% 对应文档：docs/ARCHITECTURE-v13-increment.md
+%% ============================================================
+
+%% --- 4.1 新增 / 编辑「多被保人」保单 ---
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant PF as components/policyForm.js
+    participant API as api.js
+    participant RT as routers/policies.py
+    participant PS as policy_service
+    participant IS as insured_service
+    participant CALC as calc.py
+    participant DB as SQLite
+
+    U->>PF: 勾选被保人（>=1）+ 选主被保人 + 填写其余字段 + 保存
+    PF->>PF: 校验「至少 1 名」「主被保人 in 已选」；预览以主被保人生日算年龄
+    PF->>API: createPolicy/updatePolicy({ insuredIds, primaryInsuredId, ... })
+    API->>RT: POST/PUT /api/policies
+    RT->>RT: Pydantic 校验（_validate_insureds：>=1 / 主被保人 in 列表）
+    alt 校验失败
+        RT-->>API: 422 VALIDATION_ERROR
+        API-->>PF: 抛出 -> 表单提示
+    else 校验通过
+        RT->>PS: create_policy / update_policy
+        PS->>DB: SELECT members WHERE id IN (policyholderId + insuredIds)
+        alt 有成员不存在
+            PS-->>RT: 422 VALIDATION_ERROR（memberId/role）
+        else 全部存在
+            PS->>DB: INSERT/UPDATE policies（insured_id = primaryInsuredId）
+            PS->>IS: set_policy_insureds(db, policy_id, insuredIds, primaryInsuredId)
+            IS->>DB: DELETE FROM policy_insureds WHERE policy_id=?; INSERT 全部被保人
+            PS->>DB: COMMIT
+            PS->>IS: load_insured_map(db, [policy_id])（规范序）
+            PS->>CALC: calc_schedule(policy, 主被保人, today)
+            PS-->>RT: PolicyOut（insuredIds/primaryInsuredId/insuredNames/insuredId）
+            RT-->>API: 201/200
+            API-->>PF: 成功 -> 关闭弹窗 + 刷新
+        end
+    end
+
+%% --- 4.2 启动时幂等回填迁移 ---
+sequenceDiagram
+    autonumber
+    participant LS as lifespan（app.main）
+    participant CA as Base.metadata.create_all
+    participant AM as _run_additive_migrations
+    participant BF as _backfill_policy_insureds
+    participant DB as SQLite
+
+    LS->>LS: _ensure_data_dir() / _ensure_attachments_dir()
+    LS->>CA: create_all(bind=engine)
+    Note over CA,DB: 新表 policy_insureds 自动建（含索引/外键）
+    LS->>AM: _run_additive_migrations()
+    Note over AM,DB: 既有表补可空列（本次无新增列，行为不变）
+    LS->>BF: _backfill_policy_insureds()
+    BF->>DB: 检查 policy_insureds / policies 表存在
+    BF->>DB: INSERT OR IGNORE INTO policy_insureds(policy_id, member_id) SELECT id, insured_id FROM policies
+    Note over BF,DB: 幂等：复合主键冲突自动忽略；重复启动不产生重复行
+    alt 回填异常
+        BF->>BF: logger.warning(...)，不阻塞启动
+    end
+    LS-->>LS: yield（服务就绪）
+
+%% --- 4.3 看板「按被保人」分摊 + 成员保障类型 ---
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant V as views/dashboard.js · views/members.js
+    participant RT as routers/stats.py · routers/members.py
+    participant SS as stats_service · member_service
+    participant IS as insured_service
+    participant CALC as calc.py
+    participant DB as SQLite
+
+    U->>V: 打开看板 / 成员页
+    V->>RT: GET /api/stats/dashboard · GET /api/members
+    RT->>SS: build_dashboard / list_members
+    SS->>DB: SELECT * FROM policies; SELECT * FROM members
+    SS->>IS: load_insured_map(db, policy_ids)（每单被保人，规范序）
+    loop 每张保单
+        SS->>CALC: calc_schedule(policy, 主被保人, today) -> 年化/累计/待缴
+        SS->>CALC: allocate_amounts(指标, N=被保人数) -> 分摊份额
+        Note over SS: byInsured：每个被保人 += 份额；policyCount 每人各 +1（全额）
+    end
+    SS->>SS: insuredPersonCount = 关联表被保人去重（in_coverage 且 生效中/已缴清）
+    SS->>SS: coverageTypes：按 (成员,险种) 聚合张数/生效中/分摊年化（仅 生效中/已缴清）
+    SS-->>RT: DashboardOut / MemberOut[]
+    RT-->>V: 200 JSON
+    V-->>U: 看板分摊后数值 / 成员「已有保障类型」标签
+
+%% --- 4.4 列表「电子保单」直达（0/1/>=2） ---
+sequenceDiagram
+    autonumber
+    actor U as 用户
+    participant PL as views/policies.js
+    participant AP as components/attachmentPicker.js
+    participant API as api.js
+    participant RT as routers/attachments.py
+    participant DB as SQLite
+
+    U->>PL: 点击「电子保单」列（N）
+    PL->>AP: openAttachmentPicker(policy)
+    alt N == 0
+        AP-->>U: toast「该保单暂无电子保单」
+    else N == 1
+        AP->>API: getAttachments(policyId)
+        API->>RT: GET /api/policies/{id}/attachments
+        RT->>DB: SELECT ... ORDER BY uploaded_at, id
+        RT-->>API: { attachments:[{id,...}] }
+        AP->>U: window.open(attachmentContentUrl(id,'inline')) 直接新标签打开
+    else N >= 2
+        AP->>API: getAttachments(policyId)
+        API-->>AP: 附件列表
+        AP->>U: 复用 modal.js 弹「选择要查看的电子保单」（点文件名查看 / 每项「下载」）
+    end

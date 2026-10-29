@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="家庭保险整理工具">
+  <defs>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2f6feb"/>
+      <stop offset="1" stop-color="#1b4fd8"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 2 L28 7 V15 C28 22.5 22.8 27.6 16 30 C9.2 27.6 4 22.5 4 15 V7 Z" fill="url(#shield)"/>
+  <path d="M10.5 16.2 L14.4 20.1 L21.8 12.2" fill="none" stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
