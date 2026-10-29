@@ -37,8 +37,11 @@ dist/
 *.pem
 *.key
 
-# --- 含真实家庭信息的截图（本地保留，不入库） ---
-docs/screenshots/
+# --- 截图：仅放行用虚构数据生成的演示图 ---
+docs/screenshots/*
+!docs/screenshots/demo/
+docs/screenshots/demo/*
+!docs/screenshots/demo/*.png
 
 # --- 编辑器 / 操作系统 ---
 .idea/
